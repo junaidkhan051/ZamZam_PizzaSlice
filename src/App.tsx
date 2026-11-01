@@ -1,97 +1,140 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
-  SlidersHorizontal,
   Flame,
   Clock,
   Sparkles,
   ShoppingBag,
   MapPin,
-  Filter,
+  Phone,
   Check,
   ChevronRight,
   Pizza,
   Zap,
-  Crosshair,
+  ShieldCheck,
+  Heart,
+  Utensils,
+  Award,
+  ArrowRight,
+  MessageCircle,
 } from 'lucide-react';
-import { PIZZA_SHOPS } from './data/pizzaShops';
-import { PizzaShop, MenuItem, CartItem, Order, CustomizedPizza } from './types/pizza';
+import {
+  MenuItem,
+  CartItem,
+  Order,
+  MenuCategoryId,
+  ProductCustomization,
+} from './types/pizza';
+import {
+  MENU_CATEGORIES,
+  MENU_ITEMS,
+  RESTAURANT_INFO,
+} from './data/menuData';
+import { formatPrice } from './utils/currency';
 import { Header } from './components/Header';
-import { ShopCard } from './components/ShopCard';
-import { ShopDetail } from './components/ShopDetail';
+import { ProductCard } from './components/ProductCard';
 import { PizzaCustomizerModal } from './components/PizzaCustomizerModal';
 import { CartDrawer } from './components/CartDrawer';
 import { OrderTrackerModal } from './components/OrderTrackerModal';
-import { LocationPickerModal } from './components/LocationPickerModal';
+import { SafeImage } from './components/SafeImage';
 
 export default function App() {
-  // State
+  // Language State
   const [language, setLanguage] = useState<'en' | 'ur'>('en');
-  const [currentLocation, setCurrentLocation] = useState('Marley Chowk (مرلی چوک)');
+  const isUr = language === 'ur';
+
+  // Navigation active section
+  const [activeNavSection, setActiveNavSection] = useState('hero');
+
+  // Menu Search & Filter State
+  const [selectedCategory, setSelectedCategory] = useState<MenuCategoryId | 'all'>('pizza');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTag, setFilterTag] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'recommended' | 'rating' | 'speed' | 'price'>('recommended');
+  const [sortBy, setSortBy] = useState<'recommended' | 'price_low' | 'price_high' | 'name'>('recommended');
 
-  const [selectedShop, setSelectedShop] = useState<PizzaShop | null>(null);
-  const [customizingItem, setCustomizingItem] = useState<{ item: MenuItem; shopName: string } | null>(null);
+  // Customizer Modal
+  const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
 
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Cart State with LocalStorage Persistence
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('zam_zam_cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // Active Order Tracking State
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false);
 
-  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
+  // Quick Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const isUr = language === 'ur';
+  // Sync cart to LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('zam_zam_cart_items', JSON.stringify(cart));
+    } catch (e) {
+      console.error('Failed to save cart to localStorage', e);
+    }
+  }, [cart]);
 
-  // Quick Notification Toast
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Filter & Search Logic
-  const filteredShops = useMemo(() => {
-    return PIZZA_SHOPS.filter((shop) => {
-      // Search matching
+  // Smooth Scroll navigation
+  const scrollToSection = (sectionId: string) => {
+    setActiveNavSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Filtered Menu Items
+  const filteredItems = useMemo(() => {
+    return MENU_ITEMS.filter((item) => {
+      // Category match
+      if (selectedCategory !== 'all' && item.category !== selectedCategory) {
+        return false;
+      }
+
+      // Search match
       const q = searchQuery.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        shop.name.toLowerCase().includes(q) ||
-        shop.address.toLowerCase().includes(q) ||
-        shop.area.toLowerCase().includes(q) ||
-        shop.tags.some((t) => t.toLowerCase().includes(q)) ||
-        shop.menu.some(
-          (m) =>
-            m.name.toLowerCase().includes(q) ||
-            m.description.toLowerCase().includes(q) ||
-            (m.urduName && m.urduName.includes(q))
-        );
+      if (!q) return true;
 
-      if (!matchSearch) return false;
-
-      // Filter tags
-      if (filterTag === 'all') return true;
-      if (filterTag === 'slices') return shop.hasSingleSlices;
-      if (filterTag === 'wood_fired') return shop.tags.includes('Wood Fired');
-      if (filterTag === 'fast') return parseInt(shop.deliveryTime) <= 20;
-      if (filterTag === 'top_rated') return shop.rating >= 4.8;
-      if (filterTag === 'budget') return shop.priceLevel === '$';
-      return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        (item.urduName && item.urduName.includes(q)) ||
+        item.description.toLowerCase().includes(q) ||
+        (item.dealItems && item.dealItems.some((di) => di.toLowerCase().includes(q)))
+      );
     }).sort((a, b) => {
-      if (sortBy === 'rating') return b.rating - a.rating;
-      if (sortBy === 'speed') return parseInt(a.deliveryTime) - parseInt(b.deliveryTime);
-      if (sortBy === 'price') return a.deliveryFee - b.deliveryFee;
-      return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+      if (sortBy === 'price_low') return a.price - b.price;
+      if (sortBy === 'price_high') return b.price - a.price;
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      return (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0);
     });
-  }, [searchQuery, filterTag, sortBy]);
+  }, [selectedCategory, searchQuery, sortBy]);
 
-  // Cart operations
-  const handleQuickAdd = (item: MenuItem, shop: PizzaShop) => {
+  // Featured Best Sellers for Showcase Section
+  const bestSellers = useMemo(() => {
+    return MENU_ITEMS.filter((it) => it.isBestseller).slice(0, 6);
+  }, []);
+
+  // Featured Deals for Deals Section
+  const featuredDeals = useMemo(() => {
+    return MENU_ITEMS.filter((it) => it.category === 'family-deals' || it.category === 'combo-deals').slice(0, 4);
+  }, []);
+
+  // Quick Add Standard Item to Cart
+  const handleQuickAdd = (item: MenuItem) => {
     const existingIndex = cart.findIndex(
-      (c) => c.menuItem.id === item.id && !c.customization
+      (c) => c.menuItem.id === item.id && !c.customizationSummary
     );
 
     if (existingIndex > -1) {
@@ -102,44 +145,48 @@ export default function App() {
       setCart(updated);
     } else {
       const newItem: CartItem = {
-        cartItemId: `item_${Date.now()}_${Math.random()}`,
-        shopId: shop.id,
-        shopName: shop.name,
+        cartItemId: `item_${item.id}_${Date.now()}`,
         menuItem: item,
         quantity: 1,
-        unitPrice: item.slicePrice || item.price,
-        totalPrice: item.slicePrice || item.price,
+        unitPrice: item.price,
+        totalPrice: item.price,
       };
-      setCart([...cart, newItem]);
+      setCart((prev) => [...prev, newItem]);
     }
 
     triggerToast(
       isUr
-        ? `${item.name} کارٹ میں شامل ہو گیا!`
+        ? `${item.urduName || item.name} کارٹ میں شامل ہو گیا!`
         : `Added ${item.name} to cart!`
     );
   };
 
-  const handleAddCustomized = (customized: CustomizedPizza) => {
-    if (!customizingItem || !selectedShop) return;
+  // Add Customized Item to Cart
+  const handleAddCustomized = (
+    customization: ProductCustomization | undefined,
+    quantity: number,
+    unitPrice: number,
+    summary: string
+  ) => {
+    if (!customizingItem) return;
 
+    // Different customizations must be separate entries
     const newItem: CartItem = {
-      cartItemId: `cust_${Date.now()}_${Math.random()}`,
-      shopId: selectedShop.id,
-      shopName: selectedShop.name,
-      menuItem: customizingItem.item,
-      customization: customized,
-      quantity: 1,
-      unitPrice: customized.unitPrice,
-      totalPrice: customized.unitPrice,
+      cartItemId: `cust_${customizingItem.id}_${Date.now()}_${Math.random()}`,
+      menuItem: customizingItem,
+      customization,
+      customizationSummary: summary,
+      quantity,
+      unitPrice,
+      totalPrice: unitPrice * quantity,
     };
 
-    setCart([...cart, newItem]);
+    setCart((prev) => [...prev, newItem]);
     setCustomizingItem(null);
     triggerToast(
       isUr
-        ? 'آپ کا تیار کردہ پیزا سلائس کارٹ میں شامل ہو گیا!'
-        : `Custom ${customized.sizeLabel} added to cart!`
+        ? `${customizingItem.urduName || customizingItem.name} کسٹمائزیشن کے ساتھ شامل ہو گیا!`
+        : `Added custom ${customizingItem.name} to cart!`
     );
   };
 
@@ -168,8 +215,8 @@ export default function App() {
     setIsOrderTrackerOpen(true);
     triggerToast(
       isUr
-        ? `آرڈر #${order.orderNumber} موصول ہو گیا ہے! رائیڈر آپ کی لائیو لوکیشن پر آئے گا۔`
-        : `Order #${order.orderNumber} confirmed! Rider is routed to your live location.`
+        ? `آرڈر #${order.orderNumber} موصول ہو گیا ہے! شکریہ۔`
+        : `Order #${order.orderNumber} confirmed! Chef is preparing your meal.`
     );
   };
 
@@ -177,19 +224,17 @@ export default function App() {
   const cartCount = cart.reduce((acc, it) => acc + it.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-stone-100/60 font-sans text-stone-900 antialiased flex flex-col">
-      {/* Toast popup */}
+    <div className="min-h-screen bg-[#FFF9F2] font-sans text-stone-900 antialiased flex flex-col selection:bg-red-700 selection:text-white">
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-amber-300 text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border border-amber-500/30 animate-bounce">
-          <span>🍕</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-[#171717] text-amber-300 text-xs sm:text-sm font-bold px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2 border border-amber-400/40 animate-bounce">
+          <span className="text-lg">🍕</span>
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Header */}
       <Header
-        currentLocation={currentLocation}
-        onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
         cartCount={cartCount}
         cartTotal={cartTotal}
         onOpenCart={() => setIsCartOpen(true)}
@@ -197,260 +242,745 @@ export default function App() {
         onToggleLanguage={() => setLanguage(language === 'en' ? 'ur' : 'en')}
         activeOrderCount={activeOrder ? 1 : 0}
         onOpenActiveOrder={() => setIsOrderTrackerOpen(true)}
+        activeSection={activeNavSection}
+        onNavigate={scrollToSection}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
-        {selectedShop ? (
-          // Shop Detail View
-          <ShopDetail
-            shop={selectedShop}
-            onBack={() => setSelectedShop(null)}
-            onOpenCustomizer={(item) =>
-              setCustomizingItem({ item, shopName: selectedShop.name })
-            }
-            onQuickAdd={(item) => handleQuickAdd(item, selectedShop)}
-            language={language}
-          />
-        ) : (
-          // Main Discovery & Explore Page
-          <>
-            {/* Hero Banner strictly for Marley Chowk */}
-            <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-stone-950 p-6 sm:p-10 shadow-lg">
-              <div className="relative z-10 max-w-2xl">
-                <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider bg-black/15 text-stone-950 px-3 py-1 rounded-full mb-3 backdrop-blur-xs">
-                  <MapPin className="w-3.5 h-3.5 text-stone-950" />
-                  <span>
-                    {isUr
-                      ? 'مرلی چوک پیزا ڈلیوری سروس'
-                      : 'Marley Chowk · Local Pizza & Slice Hub'}
-                  </span>
+      <main className="flex-1">
+        {/* ==================== SECTION 2: HERO SECTION ==================== */}
+        <section id="hero" className="relative overflow-hidden bg-[#171717] text-white pt-10 pb-16 lg:py-24">
+          {/* Subtle warm glow background effects */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-red-700/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+              {/* Left Column Text Content */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="inline-flex items-center gap-2 bg-red-700/30 text-amber-300 border border-red-600/40 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide backdrop-blur-xs">
+                  <span>🍕</span>
+                  <span>{RESTAURANT_INFO.name} · CHOWK MARLEY</span>
                 </div>
 
-                <h1 className="text-2xl sm:text-4xl font-black font-serif tracking-tight leading-tight">
-                  {isUr
-                    ? 'مرلی چوک کے سب سے لذیذ پیزا اور کرسپی سلائسز آرڈر کریں!'
-                    : 'Piping hot pizza slices & artisan pies delivered directly to Marley Chowk.'}
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-serif tracking-tight leading-[1.1] text-white">
+                  {isUr ? (
+                    <>
+                      کیا آپ کچھ <span className="text-amber-400">لذیذ</span> کھانے کے خواہشمند ہیں؟
+                    </>
+                  ) : (
+                    <>
+                      Craving Something <span className="text-amber-400">Delicious?</span>
+                    </>
+                  )}
                 </h1>
 
-                <p className="text-xs sm:text-sm text-stone-900/80 font-medium mt-2 max-w-lg leading-relaxed">
+                <p className="text-sm sm:text-base text-stone-300 max-w-xl leading-relaxed">
                   {isUr
-                    ? 'سنگل نیویارک سلائس، چیز برسٹ یا ووڈ فائرڈ پیزا — آرڈر کے وقت اپنی لائیو لوکیشن سیٹ کریں تاکہ رائیڈر سیدھا آپ کے دروازے پر پہنچے۔'
-                    : 'Order single slices or full pizzas from top pizzerias around Marley Chowk. Pin your live location for pin-point delivery.'}
+                    ? 'زم زم پیزا سلائس پر تازہ دم پیزا، کرسپی زنگر برگرز، لذیذ فرائز، چیزی شوارما اور شاندار فیملی ڈیلز کا لطف اٹھائیں — چوک مرلی، پنجاب میں تیز رفتار ڈیلیوری اور پک اپ کے ساتھ۔'
+                    : 'Discover freshly baked pizzas, juicy burgers, crispy fries, and irresistible deals at Zam Zam Pizza Slice. Handcrafted with premium ingredients at Chowk Marley.'}
                 </p>
 
-                {/* Search Box */}
-                <div className="mt-5 flex items-center gap-2 bg-white rounded-2xl p-2 shadow-xl border border-white/40 max-w-xl">
-                  <Search className="w-5 h-5 text-stone-400 ml-2 shrink-0" />
+                {/* Primary CTA Buttons */}
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    onClick={() => scrollToSection('menu')}
+                    className="px-6 py-3.5 rounded-2xl bg-red-700 hover:bg-red-800 text-white font-bold text-sm shadow-lg shadow-red-700/35 transition-all flex items-center gap-2 active:scale-95"
+                  >
+                    <span>{isUr ? 'ابھی آرڈر کریں' : 'Order Now'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={() => scrollToSection('menu')}
+                    className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-sm backdrop-blur-xs transition-colors"
+                  >
+                    {isUr ? 'مکمل مینیو دیکھیں' : 'Explore Menu'}
+                  </button>
+
+                  <button
+                    onClick={() => scrollToSection('deals')}
+                    className="px-4 py-3.5 rounded-2xl text-amber-400 hover:text-amber-300 text-xs sm:text-sm font-bold flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>{isUr ? 'خصوصی ڈیلز دیکھیں' : 'View Special Deals'}</span>
+                  </button>
+                </div>
+
+                {/* Micro trust indicators */}
+                <div className="pt-4 border-t border-stone-800 grid grid-cols-3 gap-3 text-xs text-stone-300">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 font-bold">✓</span>
+                    <span>100% Halal Food</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 font-bold">✓</span>
+                    <span>Fresh Hand-Tossed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 font-bold">✓</span>
+                    <span>Chowk Marley Hub</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column Showcase Collage */}
+              <div className="lg:col-span-5 relative">
+                <div className="relative mx-auto max-w-md lg:max-w-none">
+                  {/* Main Pizza Card */}
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-400/30 transform hover:scale-[1.02] transition-transform duration-500">
+                    <SafeImage
+                      src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80"
+                      alt="Special Zam Zam Pizza"
+                      fallbackCategory="pizza"
+                      className="w-full h-80 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-red-700/80 px-2.5 py-0.5 rounded-md inline-block w-max">
+                        SIGNATURE CREATION
+                      </span>
+                      <h3 className="text-xl font-bold font-serif text-white mt-1">
+                        Special Zam Zam Pizza
+                      </h3>
+                      <p className="text-xs text-stone-300 line-clamp-1">
+                        Loaded with tikka, fajita, sausages, mushrooms & cheese pull
+                      </p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-amber-300 font-mono font-bold text-sm">
+                          Starting at Rs. 850
+                        </span>
+                        <button
+                          onClick={() => {
+                            const pz = MENU_ITEMS.find((it) => it.id === 'pz-special-zam-zam');
+                            if (pz) setCustomizingItem(pz);
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-amber-400 text-stone-950 font-bold text-xs hover:bg-amber-300 transition-colors"
+                        >
+                          Customize
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overlapping Floating Zinger Card */}
+                  <div className="absolute -bottom-6 -left-6 sm:-left-10 bg-[#171717]/95 border border-amber-400/40 p-3.5 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-md max-w-[260px]">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                      <SafeImage
+                        src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=80"
+                        alt="Zinger Burger"
+                        fallbackCategory="burger"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-amber-400 font-bold uppercase">
+                        CRISPY CRUNCH
+                      </div>
+                      <div className="text-xs font-bold text-white font-serif truncate">
+                        Classic Zinger Burger
+                      </div>
+                      <div className="text-xs font-mono font-black text-red-400">
+                        Rs. 450
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ==================== SECTION 3: POPULAR CATEGORIES ==================== */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-amber-200/80">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h2 className="text-xs font-black uppercase tracking-wider text-stone-500">
+                {isUr ? 'مشہور کیٹیگریز' : 'Popular Categories'}
+              </h2>
+              <button
+                onClick={() => scrollToSection('menu')}
+                className="text-xs font-bold text-red-700 hover:underline flex items-center gap-1"
+              >
+                <span>{isUr ? 'تمام 15 کیٹیگریز' : 'View All 15 Categories'}</span>
+                <span>&rarr;</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 sm:gap-3">
+              {[
+                { id: 'pizza', name: 'Pizzas', urdu: 'پیزا', icon: '🍕', count: '10 Flavors' },
+                { id: 'slices', name: 'Pizza Slices', urdu: 'سلائسز', icon: '🍕', count: '5 Slices' },
+                { id: 'zinger-burgers', name: 'Zinger Burgers', urdu: 'زنگر برگر', icon: '🍔', count: '4 Items' },
+                { id: 'shawarma', name: 'Shawarma', urdu: 'شوارما', icon: '🌯', count: '3 Items' },
+                { id: 'fries-sides', name: 'Fries & Sides', urdu: 'فرائز', icon: '🍟', count: '8 Items' },
+                { id: 'combo-deals', name: 'Deals & Combos', urdu: 'ڈیلز', icon: '⭐', count: '7 Deals' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id as MenuCategoryId);
+                    scrollToSection('menu');
+                  }}
+                  className="p-3.5 rounded-2xl border border-amber-100 hover:border-red-600 bg-[#FFF9F2] hover:bg-red-50/50 text-left transition-all group flex flex-col justify-between"
+                >
+                  <span className="text-2xl mb-1 group-hover:scale-110 transition-transform block">
+                    {cat.icon}
+                  </span>
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold text-stone-900 group-hover:text-red-700 transition-colors font-serif truncate">
+                      {isUr ? cat.urdu : cat.name}
+                    </div>
+                    <div className="text-[10px] text-stone-500 font-sans">{cat.count}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ==================== SECTION 4: BEST SELLERS ==================== */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-xs text-red-700 font-black uppercase tracking-wider bg-red-100/60 px-3 py-1 rounded-full mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isUr ? 'سب سے زیادہ پسندیدہ' : 'Most Popular Choices'}</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black font-serif text-stone-900">
+                {isUr ? 'چوک مرلی کے بیسٹ سیلرز' : 'Zam Zam Best Sellers'}
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-500 mt-1">
+                {isUr
+                  ? 'ہمارے کسٹمرز کے پسندیدہ پیزا، برگرز اور لوڈڈ سائیڈز'
+                  : 'Customer favorites freshly baked & fried to golden perfection'}
+              </p>
+            </div>
+
+            <button
+              onClick={() => scrollToSection('menu')}
+              className="text-xs font-bold text-red-700 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto hover:underline"
+            >
+              <span>{isUr ? 'مکمل مینیو دیکھیں' : 'Explore Full Menu'}</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {bestSellers.map((item) => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                onAddToCart={handleQuickAdd}
+                onOpenCustomizer={(it) => setCustomizingItem(it)}
+                language={language}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* ==================== SECTION 5: SPECIAL OFFERS & DEALS ==================== */}
+        <section id="deals" className="bg-[#171717] text-white py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center max-w-2xl mx-auto mb-10">
+              <span className="text-xs font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-3.5 py-1.5 rounded-full inline-block mb-2">
+                🎉 MAXIMUM SAVINGS
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black font-serif text-white">
+                {isUr ? 'خصوصی فیملی اور کومبو ڈیلز' : 'Special Offers & Value Deals'}
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-300 mt-2">
+                {isUr
+                  ? 'طلباء، دوستوں اور فیملیز کے لیے زبردست رعایتی پیکجز — تمام قیمتیں پاکستانی روپوں میں'
+                  : 'Curated value bundles for students, pairs, and family gatherings with genuine sample savings.'}
+              </p>
+            </div>
+
+            {/* Deals Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredDeals.map((deal) => (
+                <div
+                  key={deal.id}
+                  className="bg-stone-900 rounded-3xl p-5 border border-amber-400/30 hover:border-amber-400 transition-all flex flex-col justify-between group shadow-xl"
+                >
+                  <div>
+                    <div className="relative aspect-[16/10] rounded-2xl overflow-hidden mb-4 bg-stone-800">
+                      <SafeImage
+                        src={deal.image}
+                        alt={deal.name}
+                        fallbackCategory={deal.fallbackCategory}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute top-2.5 left-2.5 bg-red-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
+                        HOT DEAL
+                      </span>
+                    </div>
+
+                    <h3 className="text-lg font-bold font-serif text-white group-hover:text-amber-400 transition-colors">
+                      {isUr ? deal.urduName || deal.name : deal.name}
+                    </h3>
+
+                    <p className="text-xs text-stone-400 mt-1 line-clamp-2">
+                      {deal.description}
+                    </p>
+
+                    {deal.dealItems && (
+                      <div className="mt-3 p-3 bg-stone-950/70 rounded-xl border border-stone-800 text-[11px] text-stone-300 space-y-1">
+                        {deal.dealItems.map((di, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>{di}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-stone-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-stone-400 block font-medium">Deal Price</span>
+                      <span className="text-lg font-black text-amber-400 font-mono">
+                        {formatPrice(deal.price)}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleQuickAdd(deal)}
+                      className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                    >
+                      {isUr ? 'ڈیل شامل کریں' : 'Add Deal'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ==================== SECTION 6: WHY CHOOSE US ==================== */}
+        <section id="about" className="py-16 max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-xl mx-auto mb-12">
+            <span className="text-xs font-black uppercase tracking-wider text-red-700 bg-red-100/70 px-3 py-1 rounded-full inline-block mb-2">
+              WHY ZAM ZAM
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black font-serif text-stone-900">
+              {isUr ? 'ہمیں کیوں منتخب کریں؟' : 'Why Choose Zam Zam Pizza Slice?'}
+            </h2>
+            <p className="text-xs sm:text-sm text-stone-500 mt-1">
+              {isUr
+                ? 'معیاری اجزاء اور ذائقے کی گارنٹی کے ساتھ ہر آرڈر تازہ تیار کیا جاتا ہے'
+                : 'Commitment to culinary hygiene, authentic spices, and speedy service.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: '🌱',
+                title: 'Fresh Ingredients',
+                urduTitle: 'تازہ اور معیاری اجزاء',
+                desc: 'Daily prepared sourdough, 100% mozzarella cheese, fresh farm vegetables and prime halal meats.',
+              },
+              {
+                icon: '🔥',
+                title: 'Made to Order',
+                urduTitle: 'آرڈر پر تازہ تیاری',
+                desc: 'Every pizza is stretched, topped, and baked at 450°C upon receiving your order.',
+              },
+              {
+                icon: '⭐',
+                title: 'Delicious Fast Food',
+                urduTitle: 'بہترین ذائقہ اور کرسٹ',
+                desc: 'Specialty recipes perfected over years, offering the famous cheese pull and crunchy zingers.',
+              },
+              {
+                icon: '🛵',
+                title: 'Easy WhatsApp Ordering',
+                urduTitle: 'آسان اور تیز آرڈرنگ',
+                desc: 'Place your order via WhatsApp with exact item breakdown or track progress on-site.',
+              },
+            ].map((feature, idx) => (
+              <div
+                key={idx}
+                className="p-6 rounded-3xl bg-white border border-amber-200/80 shadow-sm hover:shadow-md transition-shadow text-center"
+              >
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#FFF9F2] text-3xl flex items-center justify-center border border-amber-200">
+                  {feature.icon}
+                </div>
+                <h3 className="text-base font-bold text-stone-900 font-serif">
+                  {isUr ? feature.urduTitle : feature.title}
+                </h3>
+                <p className="text-xs text-stone-600 mt-2 leading-relaxed">
+                  {feature.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ==================== SECTION 7: COMPLETE RESTAURANT MENU ==================== */}
+        <section id="menu" className="py-14 bg-white border-y border-amber-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            {/* Menu Header with Search and Sorting */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-red-700 bg-red-50 px-3 py-1 rounded-full inline-block mb-1">
+                  OUR COMPLETE MENU
+                </span>
+                <h2 className="text-2xl sm:text-4xl font-black font-serif text-stone-900">
+                  {isUr ? 'مکمل مینیو اور قیمتیں' : 'Complete Restaurant Menu'}
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-500 mt-1">
+                  {filteredItems.length} items available in{' '}
+                  <span className="font-bold text-stone-800">
+                    {MENU_CATEGORIES.find((c) => c.id === selectedCategory)?.name || 'All Categories'}
+                  </span>
+                </p>
+              </div>
+
+              {/* Search Box & Sort Selector */}
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={
-                      isUr
-                        ? 'مرلی چوک میں پیزا، سلائس یا شاپ تلاش کریں...'
-                        : 'Search pizza, slice type, or toppings at Marley Chowk...'
-                    }
-                    className="flex-1 text-xs sm:text-sm px-2 py-1.5 text-stone-900 focus:outline-none placeholder:text-stone-400"
+                    placeholder={isUr ? 'مینیو میں تلاش کریں...' : 'Search pizza, burger, sides...'}
+                    className="w-full text-xs pl-9 pr-3 py-2.5 bg-[#FFF9F2] border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-700 text-stone-900"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="text-stone-400 hover:text-stone-600 text-xs px-2"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs"
                     >
-                      Clear
+                      ✕
                     </button>
                   )}
+                </div>
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full sm:w-auto bg-[#FFF9F2] border border-stone-200 text-stone-800 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-700 font-medium"
+                >
+                  <option value="recommended">Featured First</option>
+                  <option value="price_low">Price: Low to High</option>
+                  <option value="price_high">Price: High to Low</option>
+                  <option value="name">Alphabetical</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Sticky/Scrollable 15 Categories Navigation Bar */}
+            <div className="sticky top-18 z-30 bg-white/95 backdrop-blur-md py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 border-b border-amber-100 overflow-x-auto scrollbar-none flex items-center gap-2 mb-8">
+              {MENU_CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat.id;
+                return (
                   <button
-                    type="button"
-                    className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition-colors"
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 ${
+                      isSelected
+                        ? 'bg-red-700 text-white shadow-md shadow-red-700/20 scale-[1.02]'
+                        : 'bg-[#FFF9F2] text-stone-700 hover:bg-stone-100 border border-amber-200/60'
+                    }`}
                   >
-                    {isUr ? 'تلاش' : 'Search'}
+                    <span>{cat.icon}</span>
+                    <span>{isUr ? cat.urduName : cat.name}</span>
                   </button>
-                </div>
+                );
+              })}
+            </div>
 
-                {/* Quick Keywords */}
-                <div className="mt-3 flex items-center flex-wrap gap-2 text-[11px] text-stone-950 font-medium">
-                  <span className="opacity-75">{isUr ? 'مشہور انتخاب:' : 'Popular:'}</span>
-                  {['Single Slice', 'Pepperoni', 'Cheese Pull', 'Fajita Tikka', 'Wood Fired'].map((term) => (
-                    <button
-                      key={term}
-                      onClick={() => setSearchQuery(term)}
-                      className="underline hover:text-white transition-colors"
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Decorative background pizza silhouette */}
-              <div className="absolute -right-12 -bottom-12 opacity-20 pointer-events-none select-none text-[220px]">
-                🍕
-              </div>
-            </section>
-
-            {/* Interactive Filters & Sort Bar */}
-            <section className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {/* Segmented Filter Buttons */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  {[
-                    { id: 'all', label: isUr ? 'تمام دکانیں' : 'All Shops' },
-                    { id: 'slices', label: isUr ? '🍕 سنگل سلائسز' : '🍕 Slices Available' },
-                    { id: 'wood_fired', label: isUr ? '🔥 ووڈ فائرڈ' : '🔥 Wood-Fired' },
-                    { id: 'fast', label: isUr ? '⚡ 20 منٹ میں' : '⚡ Under 20m' },
-                    { id: 'top_rated', label: isUr ? '⭐ 4.8+ ریٹڈ' : '⭐ 4.8+ Rated' },
-                    { id: 'budget', label: isUr ? '🏷️ بجٹ فرینڈلی' : '🏷️ Value' },
-                  ].map((flt) => {
-                    const isActive = filterTag === flt.id;
-                    return (
-                      <button
-                        key={flt.id}
-                        onClick={() => setFilterTag(flt.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
-                          isActive
-                            ? 'bg-amber-500 text-stone-950 shadow-xs'
-                            : 'bg-white border border-stone-200 text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-                        }`}
-                      >
-                        {flt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Sort By Dropdown */}
-                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 text-xs text-stone-600">
-                  <span className="text-stone-400 font-medium">
-                    {isUr ? 'ترتیب:' : 'Sort by:'}
-                  </span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="bg-white border border-stone-200 text-stone-800 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
-                  >
-                    <option value="recommended">Featured & Closest</option>
-                    <option value="rating">Highest Rated</option>
-                    <option value="speed">Fastest Delivery</option>
-                    <option value="price">Lowest Delivery Fee</option>
-                  </select>
-                </div>
-              </div>
-            </section>
-
-            {/* Pizza Shops Grid */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
+            {/* Category Description Banner */}
+            {selectedCategory !== 'all' && (
+              <div className="mb-6 p-4 rounded-2xl bg-[#FFF9F2] border border-amber-200 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-stone-900 font-serif">
-                    {isUr ? 'مرلی چوک کی قریبی پیزا شاپس' : 'Pizza Shops at Marley Chowk'}
-                  </h2>
-                  <p className="text-xs text-stone-500 font-sans">
-                    {filteredShops.length} {filteredShops.length === 1 ? 'shop' : 'shops'} currently open for instant delivery
-                  </p>
-                </div>
-              </div>
-
-              {filteredShops.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-3xl border border-stone-200">
-                  <div className="text-4xl mb-3">🍕🔍</div>
-                  <h3 className="text-base font-bold text-stone-900">
-                    {isUr ? 'کوئی پیزیریا نہیں ملا' : 'No Pizza Shops Found'}
+                  <h3 className="text-sm font-bold text-stone-900 font-serif">
+                    {MENU_CATEGORIES.find((c) => c.id === selectedCategory)?.name}
                   </h3>
-                  <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1">
-                    {isUr
-                      ? 'برائے مہربانی دیگر کی ورڈز آزمائیں یا فلٹر ری سیٹ کریں۔'
-                      : 'Try resetting your search query or filters to see all Marley Chowk pizzerias.'}
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    {MENU_CATEGORIES.find((c) => c.id === selectedCategory)?.description}
                   </p>
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setFilterTag('all');
-                    }}
-                    className="mt-4 px-4 py-2 bg-amber-500 text-stone-950 font-bold text-xs rounded-xl hover:bg-amber-600 transition-colors"
-                  >
-                    Reset Filters
-                  </button>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredShops.map((shop) => (
-                    <ShopCard
-                      key={shop.id}
-                      shop={shop}
-                      onSelect={(s) => setSelectedShop(s)}
-                      language={language}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+                <span className="text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-lg">
+                  {filteredItems.length} Products
+                </span>
+              </div>
+            )}
 
-            {/* Live Location Awareness feature card */}
-            <section className="p-6 rounded-3xl bg-stone-900 text-stone-100 flex flex-col md:flex-row items-center justify-between gap-6 border border-stone-800">
-              <div className="space-y-2 max-w-xl">
-                <div className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-bold bg-emerald-500/15 px-2.5 py-1 rounded-full">
-                  <Crosshair className="w-3.5 h-3.5" />
-                  <span>{isUr ? 'درست لائیو جی پی ایس ڈیلیوری' : 'Pinpoint Live GPS Delivery'}</span>
-                </div>
-                <h3 className="text-xl font-bold font-serif text-white">
-                  {isUr
-                    ? 'مرلی چوک میں اپنی درست گلی اور مکان کی لوکیشن لائیو سیٹ کریں'
-                    : 'Set your exact live location so the rider arrives without delay'}
+            {/* Products Grid */}
+            {filteredItems.length === 0 ? (
+              <div className="py-16 text-center bg-[#FFF9F2] rounded-3xl border border-dashed border-amber-300">
+                <div className="text-4xl mb-2">🔍🍕</div>
+                <h3 className="text-base font-bold text-stone-800 font-serif">
+                  No matching food items found
                 </h3>
-                <p className="text-xs text-stone-400 leading-relaxed">
+                <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+                  Try checking your search query or switch categories to explore our full menu.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('pizza');
+                  }}
+                  className="mt-4 px-4 py-2 bg-red-700 text-white font-bold text-xs rounded-xl hover:bg-red-800 transition-colors"
+                >
+                  View All Pizzas
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredItems.map((item) => (
+                  <ProductCard
+                    key={item.id}
+                    item={item}
+                    onAddToCart={handleQuickAdd}
+                    onOpenCustomizer={(it) => setCustomizingItem(it)}
+                    language={language}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ==================== SECTION 8 & 9: LOCATION, HOURS & CONTACT ==================== */}
+        <section id="location" className="py-16 max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left Info Card */}
+            <div className="lg:col-span-5 space-y-6">
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-red-700 bg-red-100/70 px-3 py-1 rounded-full inline-block mb-1">
+                  OUR LOCATION & TIMINGS
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black font-serif text-stone-900">
+                  {isUr ? 'چوک مرلی، پنجاب میں خوش آمدید' : 'Visit Us at Chowk Marley'}
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
                   {isUr
-                    ? 'جب آپ کارٹ میں چیک آؤٹ کرتے ہیں، آپ ایک کلک میں اپنا لائیو جی پی ایس اور نقشے پر پن سیٹ کر سکتے ہیں تاکہ گرم پیزا بغیر کسی تاخیر کے پہنچے۔'
-                    : 'When placing an order, tap "Use Live GPS" or pinpoint your house on the interactive map so the rider navigates directly to your door.'}
+                    ? 'زم زم پیزا سلائس چوک مرلی کی مرکزی تجارتی مارکیٹ میں واقع ہے۔ ٹیک اوے، ڈائن اِن یا تیز ہوم ڈیلیوری کے لیے ہم سے رابطہ کریں۔'
+                    : 'Located at the heart of Chowk Marley commercial zone. Stop by for hot takeaway slices or order for doorstep delivery.'}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => setIsLocationPickerOpen(true)}
-                  className="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-2"
-                >
-                  <MapPin className="w-4 h-4 text-stone-950" />
-                  <span>{isUr ? 'لوکیشن چیک کریں' : 'Set Location'}</span>
-                </button>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-amber-200">
+                  <div className="w-10 h-10 rounded-xl bg-red-50 text-red-700 flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs">
+                    <div className="font-bold text-stone-900 text-sm">Restaurant Address</div>
+                    <div className="text-stone-600 mt-0.5">{RESTAURANT_INFO.address}</div>
+                    <div className="text-stone-400 mt-0.5">Punjab, Pakistan</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-amber-200">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs">
+                    <div className="font-bold text-stone-900 text-sm">Opening Hours</div>
+                    <div className="text-stone-600 mt-0.5">{RESTAURANT_INFO.openingHours}</div>
+                    <div className="text-emerald-700 font-bold mt-0.5">● Kitchen Open Now</div>
+                  </div>
+                </div>
+
+                <div id="contact" className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-amber-200">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs">
+                    <div className="font-bold text-stone-900 text-sm">Phone & WhatsApp Orders</div>
+                    <div className="text-stone-600 mt-0.5">{RESTAURANT_INFO.phone}</div>
+                    <div className="text-stone-400 mt-0.5">WhatsApp: +{RESTAURANT_INFO.whatsappPhone}</div>
+                  </div>
+                </div>
               </div>
-            </section>
-          </>
-        )}
+
+              {/* Direct WhatsApp Call to Action */}
+              <div className="pt-2">
+                <a
+                  href={`https://wa.me/${RESTAURANT_INFO.whatsappPhone}?text=${encodeURIComponent('Hello Zam Zam Pizza Slice! I would like to inquire about your menu.')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat with Us on WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Right Interactive Location Map Canvas */}
+            <div className="lg:col-span-7">
+              <div className="relative h-96 rounded-3xl overflow-hidden border-2 border-amber-200 bg-stone-100 shadow-xl">
+                {/* Stylized Street Grid */}
+                <svg className="absolute inset-0 w-full h-full opacity-60">
+                  <defs>
+                    <pattern id="mainMapGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#cbd5e1" strokeWidth="1" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#mainMapGrid)" />
+                  {/* Roads radiating */}
+                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#f59e0b" strokeWidth="8" />
+                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#f59e0b" strokeWidth="8" />
+                  {/* Chowk Roundabout */}
+                  <circle cx="50%" cy="50%" r="55" fill="#fef3c7" stroke="#d97706" strokeWidth="3" />
+                  <circle cx="50%" cy="50%" r="35" fill="#b91c1c" />
+                </svg>
+
+                {/* Restaurant Central Marker */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none z-10">
+                  <div className="relative">
+                    <span className="absolute -inset-2 rounded-full bg-red-400 animate-ping opacity-60" />
+                    <div className="w-14 h-14 rounded-2xl bg-red-700 text-white flex items-center justify-center text-2xl shadow-2xl border-2 border-amber-300">
+                      🍕
+                    </div>
+                  </div>
+                  <div className="bg-[#171717] text-white text-xs font-black px-3 py-1 rounded-full shadow-lg mt-2 whitespace-nowrap border border-amber-400/40">
+                    ZAM ZAM PIZZA SLICE
+                  </div>
+                  <div className="text-[10px] text-amber-300 font-bold bg-black/80 px-2 py-0.5 rounded mt-0.5">
+                    Chowk Marley Main
+                  </div>
+                </div>
+
+                {/* Delivery Zone Badge */}
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-stone-200 text-xs shadow-md">
+                  <span className="font-bold text-stone-900 block">Fast Delivery Radius</span>
+                  <span className="text-[11px] text-stone-500">Chowk Marley & Surrounding Sectors (15-25 min)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto border-t border-stone-200 bg-white py-8 px-4 text-center text-xs text-stone-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🍕</span>
-            <span className="font-bold text-stone-800 font-serif">Pizza Slice</span>
-            <span>· Hot Local Pizza Delivery at Marley Chowk</span>
+      {/* ==================== SECTION 10: PROFESSIONAL FOOTER ==================== */}
+      <footer className="bg-[#171717] text-stone-300 border-t border-stone-800 pt-14 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 pb-12 border-b border-stone-800">
+            {/* Col 1: Brand Info */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-700 text-white flex items-center justify-center text-xl font-bold shadow-md">
+                  🍕
+                </div>
+                <div>
+                  <div className="text-lg font-black tracking-tight text-white font-serif leading-none">
+                    ZAM ZAM <span className="text-red-500">PIZZA SLICE</span>
+                  </div>
+                  <div className="text-[11px] text-amber-400 font-medium font-sans mt-0.5">
+                    {RESTAURANT_INFO.tagline}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-stone-400 max-w-sm leading-relaxed">
+                Handcrafted pizzas, crispy single slices, double zinger burgers, stuffed shawarmas, and value family feasts. Serving Chowk Marley with pride and taste perfection.
+              </p>
+
+              <div className="text-xs text-stone-400 space-y-1">
+                <div>📍 {RESTAURANT_INFO.address}</div>
+                <div>📞 Phone: {RESTAURANT_INFO.phone}</div>
+                <div>💬 WhatsApp: +{RESTAURANT_INFO.whatsappPhone}</div>
+              </div>
+            </div>
+
+            {/* Col 2: Quick Links */}
+            <div className="lg:col-span-3 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                Menu Categories
+              </h4>
+              <ul className="text-xs space-y-2 text-stone-400">
+                {MENU_CATEGORIES.slice(0, 6).map((cat) => (
+                  <li key={cat.id}>
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        scrollToSection('menu');
+                      }}
+                      className="hover:text-amber-400 transition-colors"
+                    >
+                      {cat.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Col 3: Operating Hours */}
+            <div className="lg:col-span-4 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                Opening Hours & Info
+              </h4>
+              <div className="text-xs space-y-2 text-stone-400">
+                <div className="flex justify-between py-1 border-b border-stone-800">
+                  <span>Monday – Sunday</span>
+                  <span className="font-bold text-white">11:00 AM – 02:00 AM</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-stone-800">
+                  <span>Minimum Order</span>
+                  <span className="font-bold text-white">{formatPrice(RESTAURANT_INFO.minOrder)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-stone-800">
+                  <span>Standard Delivery Fee</span>
+                  <span className="font-bold text-white">{formatPrice(RESTAURANT_INFO.deliveryFee)}</span>
+                </div>
+                <div className="text-[11px] text-amber-300 font-medium pt-1">
+                  Free delivery for orders above {formatPrice(RESTAURANT_INFO.freeDeliveryThreshold)}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <button
-              onClick={() => setIsLocationPickerOpen(true)}
-              className="text-stone-700 hover:underline"
-            >
-              📍 {currentLocation}
-            </button>
-            <span>© {new Date().getFullYear()} Pizza Slice</span>
+
+          {/* Portfolio Demonstration Disclaimer */}
+          <div className="pt-8 text-center space-y-2">
+            <div className="p-3 bg-stone-900 rounded-2xl border border-stone-800 max-w-3xl mx-auto text-[11px] text-stone-400 leading-relaxed">
+              <strong>Portfolio Demonstration Disclaimer:</strong> This web application is a portfolio restaurant website demonstration. Menu items, sample demonstration prices, offers, and ordering workflows are designed for demonstration purposes. Actual restaurant menu pricing and official contact information can be configured as needed.
+            </div>
+
+            <div className="text-xs text-stone-500 pt-2 flex flex-col sm:flex-row items-center justify-between gap-2 max-w-3xl mx-auto">
+              <span>© {new Date().getFullYear()} Zam Zam Pizza Slice. All rights reserved.</span>
+              <span>Chowk Marley, Punjab, Pakistan</span>
+            </div>
           </div>
         </div>
       </footer>
 
-      {/* Modals & Overlays */}
+      {/* Floating Mobile Cart Bar */}
+      {cartCount > 0 && !isCartOpen && (
+        <div className="fixed bottom-4 left-4 right-4 z-40 sm:hidden">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-full py-3.5 px-5 bg-red-700 active:bg-red-800 text-white font-bold rounded-2xl shadow-2xl flex items-center justify-between border-2 border-amber-300/60"
+          >
+            <div className="flex items-center gap-2">
+              <span className="bg-amber-400 text-stone-950 font-black text-xs px-2 py-0.5 rounded-full">
+                {cartCount}
+              </span>
+              <span className="text-sm">View Cart ({isUr ? 'کارٹ دیکھیں' : 'Checkout'})</span>
+            </div>
+            <div className="font-mono font-black text-sm text-amber-300">
+              {formatPrice(cartTotal)}
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Product Customizer Modal */}
       {customizingItem && (
         <PizzaCustomizerModal
-          item={customizingItem.item}
-          shopName={customizingItem.shopName}
+          item={customizingItem}
           onClose={() => setCustomizingItem(null)}
           onAddToCart={handleAddCustomized}
           language={language}
         />
       )}
 
+      {/* Shopping Cart Drawer */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -459,21 +989,14 @@ export default function App() {
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
         onPlaceOrder={handlePlaceOrder}
-        currentAddress={currentLocation}
+        currentAddress="Chowk Marley, Punjab, Pakistan"
         language={language}
       />
 
+      {/* Order Tracker Modal */}
       <OrderTrackerModal
         order={activeOrder}
         onClose={() => setIsOrderTrackerOpen(false)}
-        language={language}
-      />
-
-      <LocationPickerModal
-        isOpen={isLocationPickerOpen}
-        onClose={() => setIsLocationPickerOpen(false)}
-        currentLocation={currentLocation}
-        onSelectLocation={(loc) => setCurrentLocation(loc)}
         language={language}
       />
     </div>

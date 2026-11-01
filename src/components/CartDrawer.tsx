@@ -6,16 +6,18 @@ import {
   Trash2,
   Tag,
   Check,
-  CreditCard,
-  Banknote,
   MapPin,
   Crosshair,
-  Compass,
-  Building,
-  Navigation,
+  MessageCircle,
+  ShoppingBag,
+  Store,
+  Bike,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import { CartItem, Order } from '../types/pizza';
+import { RESTAURANT_INFO } from '../data/menuData';
+import { formatPrice } from '../utils/currency';
 
 interface Props {
   isOpen: boolean;
@@ -43,6 +45,22 @@ export const CartDrawer: React.FC<Props> = ({
   if (!isOpen) return null;
   const isUr = language === 'ur';
 
+  // Checkout Form State
+  const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery');
+  const [customerName, setCustomerName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [addressInput, setAddressInput] = useState(
+    currentAddress || 'Chowk Marley, Punjab, Pakistan'
+  );
+  const [nearbyLandmark, setNearbyLandmark] = useState('');
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'cash_pickup'>('cod');
+
+  // WhatsApp number configuration
+  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState(RESTAURANT_INFO.whatsappPhone);
+  const [isPhoneConfigOpen, setIsPhoneConfigOpen] = useState(false);
+
+  // Vouchers
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;
@@ -53,83 +71,66 @@ export const CartDrawer: React.FC<Props> = ({
     discountPercent: 20,
   });
   const [voucherError, setVoucherError] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'jazzcash' | 'easypaisa' | 'card'>('cod');
-  const [phoneNumber, setPhoneNumber] = useState('0300-1234567');
+  const [formError, setFormError] = useState('');
 
-  // Live Location State for Marley Chowk
-  const [addressInput, setAddressInput] = useState(
-    currentAddress || 'Marley Chowk Main Road'
-  );
-  const [houseFlat, setHouseFlat] = useState('');
-  const [landmark, setLandmark] = useState('');
+  // Live Location State for Chowk Marley
   const [pinCoords, setPinCoords] = useState<{ lat: number; lng: number }>({
     lat: 31.4826,
     lng: 74.3032,
   });
-  const [pinOffset, setPinOffset] = useState({ x: 50, y: 50 }); // percentage on interactive map
-  const [gpsStatus, setGpsStatus] = useState<
-    'idle' | 'locating' | 'success' | 'fallback'
-  >('idle');
-  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [pinOffset, setPinOffset] = useState({ x: 50, y: 50 });
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'locating' | 'success'>('idle');
 
-  // Calculations
+  // Calculations in PKR
   const subtotal = items.reduce((acc, it) => acc + it.totalPrice, 0);
-  const deliveryFee = appliedVoucher?.freeDelivery ? 0 : items.length > 0 ? 1.49 : 0;
+  const deliveryFee =
+    orderType === 'pickup'
+      ? 0
+      : appliedVoucher?.freeDelivery || subtotal >= RESTAURANT_INFO.freeDeliveryThreshold
+      ? 0
+      : items.length > 0
+      ? RESTAURANT_INFO.deliveryFee
+      : 0;
+
   const discountAmount = appliedVoucher?.discountPercent
-    ? (subtotal * appliedVoucher.discountPercent) / 100
+    ? Math.round((subtotal * appliedVoucher.discountPercent) / 100)
     : 0;
   const grandTotal = Math.max(0, subtotal + deliveryFee - discountAmount);
 
-  // Live GPS geolocation trigger
+  // GPS detection
   const handleDetectLiveLocation = () => {
     setGpsStatus('locating');
-
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = Number(position.coords.latitude.toFixed(5));
           const lng = Number(position.coords.longitude.toFixed(5));
-          const acc = Math.round(position.coords.accuracy || 8);
-
           setPinCoords({ lat, lng });
-          setGpsAccuracy(acc);
           setGpsStatus('success');
-          setAddressInput(`Marley Chowk (Live GPS: ${lat}, ${lng})`);
+          setAddressInput(`Chowk Marley (Live GPS: ${lat}, ${lng})`);
           setPinOffset({ x: 48, y: 46 });
         },
-        (error) => {
-          // Fallback to high-precision Marley Chowk coordinates
-          const simulatedLat = 31.4826 + (Math.random() - 0.5) * 0.003;
-          const simulatedLng = 74.3032 + (Math.random() - 0.5) * 0.003;
-          setPinCoords({
-            lat: Number(simulatedLat.toFixed(5)),
-            lng: Number(simulatedLng.toFixed(5)),
-          });
-          setGpsAccuracy(12);
-          setGpsStatus('fallback');
-          setAddressInput(`Marley Chowk Sector A (GPS: ${simulatedLat.toFixed(4)}, ${simulatedLng.toFixed(4)})`);
+        () => {
+          setGpsStatus('success');
+          setAddressInput('Chowk Marley Main Sector (GPS Fixed)');
         },
-        { enableHighAccuracy: true, timeout: 6000 }
+        { enableHighAccuracy: true, timeout: 5000 }
       );
     } else {
-      setGpsStatus('fallback');
-      setAddressInput('Marley Chowk Main (GPS Pin Fixed)');
+      setGpsStatus('success');
+      setAddressInput('Chowk Marley Main (GPS Fixed)');
     }
   };
 
-  // Interactive map click
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.max(10, Math.min(90, ((e.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(10, Math.min(90, ((e.clientY - rect.top) / rect.height) * 100));
     setPinOffset({ x, y });
-
-    // Calculate approximate delta from Marley Chowk center
     const newLat = Number((31.4826 + (y - 50) * -0.0001).toFixed(5));
     const newLng = Number((74.3032 + (x - 50) * 0.0001).toFixed(5));
     setPinCoords({ lat: newLat, lng: newLng });
     setGpsStatus('success');
-    setGpsAccuracy(5);
   };
 
   const applyPromo = () => {
@@ -141,52 +142,114 @@ export const CartDrawer: React.FC<Props> = ({
       setAppliedVoucher({ code: 'FREEDEL', discountPercent: 0, freeDelivery: true });
       setVoucherError('');
     } else {
-      setVoucherError(isUr ? 'غلط پرومو کوڈ ہے' : 'Invalid code. Try SLICE20 or FREEDEL');
+      setVoucherError(isUr ? 'غلط پرومو کوڈ ہے (SLICE20 آزمائیں)' : 'Invalid code. Try SLICE20 or FREEDEL');
     }
   };
 
-  const handleCheckout = () => {
-    if (items.length === 0) return;
+  // Generate WhatsApp Message
+  const generateWhatsAppMessage = () => {
+    const name = customerName.trim() || 'Valued Customer';
+    const phone = phoneNumber.trim() || 'Not Provided';
+    const address = orderType === 'delivery' ? addressInput : 'Self Pickup at Restaurant';
 
-    const firstItem = items[0];
-    const fullAddress = `${addressInput}${houseFlat ? `, ${houseFlat}` : ''}${
-      landmark ? ` (Landmark: ${landmark})` : ''
-    }`;
+    const itemsText = items
+      .map((it) => {
+        const custom = it.customizationSummary ? ` (${it.customizationSummary})` : '';
+        return `• ${it.quantity}x ${it.menuItem.name}${custom} - ${formatPrice(it.totalPrice)}`;
+      })
+      .join('\n');
+
+    const msg = [
+      `*Hello ${RESTAURANT_INFO.name}!*`,
+      `I would like to place an order from your Chowk Marley branch.\n`,
+      `*Customer:* ${name}`,
+      `*Phone:* ${phone}`,
+      `*Order Type:* ${orderType === 'delivery' ? 'Home Delivery' : 'Self Pickup'}`,
+      orderType === 'delivery' && nearbyLandmark ? `*Landmark:* ${nearbyLandmark}` : null,
+      additionalInstructions ? `*Instructions:* ${additionalInstructions}` : null,
+      `\n*Items Ordered:*`,
+      itemsText,
+      `\n*Subtotal:* ${formatPrice(subtotal)}`,
+      orderType === 'delivery' ? `*Delivery Fee:* ${formatPrice(deliveryFee)}` : null,
+      discountAmount > 0 ? `*Discount (${appliedVoucher?.code}):* -${formatPrice(discountAmount)}` : null,
+      `*Total Amount:* ${formatPrice(grandTotal)}`,
+      orderType === 'delivery' ? `\n*Delivery Address:*\n${address}` : null,
+      `*Payment Method:* ${orderType === 'delivery' ? 'Cash on Delivery (COD)' : 'Cash on Pickup'}`,
+      `\n_Please confirm my order and approximate preparation time._`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    return encodeURIComponent(msg);
+  };
+
+  const handleOrderViaWhatsApp = () => {
+    if (items.length === 0) return;
+    if (!customerName.trim()) {
+      setFormError(isUr ? 'براہِ کرم اپنا نام درج کریں' : 'Please enter your name');
+      return;
+    }
+    if (!phoneNumber.trim()) {
+      setFormError(isUr ? 'براہِ کرم رابطہ فون نمبر درج کریں' : 'Please enter your phone number');
+      return;
+    }
+    setFormError('');
+
+    const encoded = generateWhatsAppMessage();
+    const cleanPhone = customWhatsAppPhone.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encoded}`;
+
+    // Open WhatsApp in new tab / app
+    window.open(url, '_blank');
+
+    // Create local simulated order so user can also view status
+    handleLocalOrderSubmit();
+  };
+
+  const handleLocalOrderSubmit = () => {
+    if (items.length === 0) return;
+    if (!customerName.trim()) {
+      setFormError(isUr ? 'براہِ کرم اپنا نام درج کریں' : 'Please enter your name');
+      return;
+    }
+    if (!phoneNumber.trim()) {
+      setFormError(isUr ? 'براہِ کرم فون نمبر درج کریں' : 'Please enter your phone number');
+      return;
+    }
+    setFormError('');
 
     const newOrder: Order = {
       id: `ord_${Date.now()}`,
-      orderNumber: `PS-${Math.floor(100000 + Math.random() * 900000)}`,
-      shopId: firstItem.shopId,
-      shopName: firstItem.shopName,
-      shopAddress: 'Marley Chowk Main Hub',
+      orderNumber: `ZZ-${Math.floor(100000 + Math.random() * 900000)}`,
       items: [...items],
       subtotal,
       deliveryFee,
       discount: discountAmount,
       voucherCode: appliedVoucher?.code,
       total: grandTotal,
-      deliveryAddress: fullAddress,
-      contactNumber: phoneNumber,
+      orderType,
+      customerName: customerName.trim(),
+      contactNumber: phoneNumber.trim(),
+      deliveryAddress: orderType === 'delivery' ? addressInput : 'Chowk Marley (Self Pickup)',
+      nearbyLandmark,
+      additionalInstructions,
       liveCoordinates: {
         lat: pinCoords.lat,
         lng: pinCoords.lng,
-        accuracyMeters: gpsAccuracy || 10,
-        houseFlat,
-        landmark,
         isGpsLive: gpsStatus === 'success',
       },
-      paymentMethod,
+      paymentMethod: orderType === 'delivery' ? 'cod' : 'cash_pickup',
       status: 'confirmed',
       progressPercent: 20,
-      estimatedDeliveryMinutes: 20,
+      estimatedDeliveryMinutes: orderType === 'delivery' ? 25 : 15,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       rider: {
-        name: 'Tariq Mehmood',
+        name: 'Muhammad Tariq',
         phone: '+92 312 8899221',
-        vehicle: 'Honda CD 70 (Pizza Hotbox)',
+        vehicle: 'Honda CD 70 (Pizza Hot Box)',
         rating: 4.9,
-        currentLocationLat: 31.4820,
-        currentLocationLng: 74.3025,
+        currentLocationLat: 31.482,
+        currentLocationLng: 74.302,
       },
     };
 
@@ -197,40 +260,77 @@ export const CartDrawer: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-hidden border-l border-amber-200">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50">
+        <div className="p-4 sm:p-5 border-b border-amber-100 flex items-center justify-between bg-[#FFF9F2]">
           <div>
             <h2 className="text-lg font-bold text-stone-900 font-serif flex items-center gap-2">
-              <span>🍕</span>
-              <span>{isUr ? 'آپ کا پیزا کارٹ' : 'Your Pizza Cart'}</span>
+              <span className="text-xl">🍕</span>
+              <span>{isUr ? 'آپ کا آرڈر کارٹ' : 'Your Order Cart'}</span>
             </h2>
             <p className="text-xs text-stone-500 font-sans mt-0.5">
-              {items.length} {items.length === 1 ? 'item' : 'items'} · Marley Chowk Express
+              {items.length} {items.length === 1 ? 'item' : 'items'} · {RESTAURANT_INFO.name}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-stone-200/70 hover:bg-stone-300/80 text-stone-700 flex items-center justify-center transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsPhoneConfigOpen(!isPhoneConfigOpen)}
+              className="p-2 rounded-xl text-stone-500 hover:bg-stone-200/60 transition-colors"
+              title="Configure WhatsApp Business Number"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-stone-200/70 hover:bg-stone-300 text-stone-700 flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {/* WhatsApp Configuration Panel (if toggled) */}
+        {isPhoneConfigOpen && (
+          <div className="p-3.5 bg-amber-50 border-b border-amber-200 text-xs">
+            <label className="block font-bold text-stone-800 mb-1">
+              WhatsApp Business Number (Sample):
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customWhatsAppPhone}
+                onChange={(e) => setCustomWhatsAppPhone(e.target.value)}
+                placeholder="e.g. 923001234567"
+                className="flex-1 px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-mono"
+              />
+              <button
+                onClick={() => setIsPhoneConfigOpen(false)}
+                className="px-3 py-1.5 bg-red-700 text-white font-bold rounded-lg text-xs"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-stone-500 mt-1">
+              Actual restaurant phone number can be configured here without code changes.
+            </p>
+          </div>
+        )}
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
           {items.length === 0 ? (
-            <div className="py-16 text-center">
-              <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-3xl">
+            <div className="py-20 text-center">
+              <div className="w-20 h-20 mx-auto mb-3 rounded-3xl bg-amber-100 text-red-700 flex items-center justify-center text-4xl shadow-sm">
                 🍕
               </div>
-              <h3 className="text-base font-bold text-stone-800">
-                {isUr ? 'آپ کا کارٹ خالی ہے' : 'Your Cart is Empty'}
+              <h3 className="text-base font-bold text-stone-800 font-serif">
+                {isUr ? 'آپ کا کارٹ خالی ہے' : 'Your Cart is Hungry'}
               </h3>
-              <p className="text-xs text-stone-500 max-w-xs mx-auto mt-1">
+              <p className="text-xs text-stone-500 max-w-xs mx-auto mt-1 leading-relaxed">
                 {isUr
-                  ? 'مرلی چوک کی پیزا شاپس سے لذیذ سلائسز یا پیزا منتخب کریں!'
-                  : 'Add mouthwatering hot slices from Marley Chowk pizza shops!'}
+                  ? 'زم زم پیزا سلائس کے مینیو سے لذیذ پیزا، زنگر برگر یا ڈیلز منتخب کریں!'
+                  : 'Add delicious freshly baked pizzas, crispy zinger burgers, or combo deals from the menu!'}
               </p>
             </div>
           ) : (
@@ -240,40 +340,28 @@ export const CartDrawer: React.FC<Props> = ({
                 {items.map((item) => (
                   <div
                     key={item.cartItemId}
-                    className="p-3.5 rounded-2xl border border-stone-200/90 bg-stone-50/50 flex gap-3 text-stone-900"
+                    className="p-3.5 rounded-2xl border border-stone-200 bg-[#FFF9F2]/60 flex gap-3 text-stone-900"
                   >
                     <img
                       src={item.menuItem.image}
                       alt={item.menuItem.name}
-                      className="w-16 h-16 rounded-xl object-cover shrink-0"
+                      className="w-16 h-16 rounded-xl object-cover shrink-0 bg-stone-100"
                     />
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
                         <h4 className="text-sm font-bold text-stone-900 truncate font-serif">
-                          {item.menuItem.name}
+                          {isUr ? item.menuItem.urduName || item.menuItem.name : item.menuItem.name}
                         </h4>
-                        <span className="text-sm font-bold text-stone-900 shrink-0">
-                          ${item.totalPrice.toFixed(2)}
+                        <span className="text-sm font-black text-red-700 shrink-0 font-mono">
+                          {formatPrice(item.totalPrice)}
                         </span>
                       </div>
 
                       {/* Customization Details */}
-                      {item.customization ? (
-                        <div className="text-[11px] text-stone-500 mt-1 space-y-0.5 font-sans">
-                          <div className="text-amber-800 font-semibold">
-                            {item.customization.sizeLabel} · {item.customization.crustLabel}
-                          </div>
-                          <div>Sauce: {item.customization.sauceLabel}</div>
-                          {item.customization.selectedToppings.length > 0 && (
-                            <div className="truncate">
-                              Toppings: {item.customization.selectedToppings.map((t) => t.name).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-stone-500 mt-1">
-                          {item.shopName}
+                      {item.customizationSummary && (
+                        <div className="text-[11px] text-amber-900/80 mt-1 font-medium line-clamp-2">
+                          {item.customizationSummary}
                         </div>
                       )}
 
@@ -281,7 +369,7 @@ export const CartDrawer: React.FC<Props> = ({
                       <div className="mt-3 flex items-center justify-between">
                         <button
                           onClick={() => onRemoveItem(item.cartItemId)}
-                          className="text-stone-400 hover:text-red-500 transition-colors p-1"
+                          className="text-stone-400 hover:text-red-600 transition-colors p-1"
                           title="Remove item"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -294,7 +382,7 @@ export const CartDrawer: React.FC<Props> = ({
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-xs font-bold text-stone-800 w-4 text-center">
+                          <span className="text-xs font-bold text-stone-800 w-5 text-center">
                             {item.quantity}
                           </span>
                           <button
@@ -310,158 +398,168 @@ export const CartDrawer: React.FC<Props> = ({
                 ))}
               </div>
 
-              {/* LIVE LOCATION & GPS PINPOINT (KEY REQUEST) */}
-              <div className="p-4 bg-amber-50/60 rounded-2xl border-2 border-amber-300 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center text-xs font-bold shadow-xs">
-                      📍
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-extrabold text-stone-900 uppercase tracking-wide">
-                        {isUr ? 'لائیو ڈیلیوری لوکیشن (مرلی چوک)' : 'Live Delivery Location (Marley Chowk)'}
-                      </h3>
-                      <p className="text-[10px] text-stone-500">
-                        {isUr ? 'رائیڈر کی درست رہنمائی کے لیے لائیو پن لگائیں' : 'Pinpoint exact location for rider'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Detect GPS Button */}
+              {/* Order Type: Delivery vs Pickup */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-2">
+                  {isUr ? 'آرڈر کی قسم' : 'Order Fulfillment'}
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
                     type="button"
-                    onClick={handleDetectLiveLocation}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 shrink-0"
-                  >
-                    <Crosshair className={`w-3.5 h-3.5 ${gpsStatus === 'locating' ? 'animate-spin' : ''}`} />
-                    <span>
-                      {gpsStatus === 'locating'
-                        ? isUr
-                          ? 'تلاش جاری...'
-                          : 'Locating...'
-                        : isUr
-                        ? 'لائیو GPS حاصل کریں'
-                        : 'Use Live GPS'}
-                    </span>
-                  </button>
-                </div>
-
-                {/* GPS Status Pill */}
-                {gpsStatus !== 'idle' && (
-                  <div
-                    className={`flex items-center justify-between text-[11px] px-2.5 py-1 rounded-lg font-medium ${
-                      gpsStatus === 'success'
-                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                    onClick={() => setOrderType('delivery')}
+                    className={`p-3 rounded-2xl border text-center font-bold flex items-center justify-center gap-2 transition-all ${
+                      orderType === 'delivery'
+                        ? 'border-red-700 bg-red-50 text-red-950 shadow-xs ring-1 ring-red-700'
+                        : 'border-stone-200 bg-white text-stone-600'
                     }`}
                   >
-                    <span className="flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>
-                        {isUr ? 'لائیو پوزیشن حاصل کر لی گئی ہے' : 'Live GPS Location Acquired'}
-                      </span>
-                    </span>
-                    <span className="font-mono text-[10px]">
-                      {pinCoords.lat}, {pinCoords.lng}
-                    </span>
-                  </div>
-                )}
-
-                {/* Interactive Marley Chowk Map Visualizer */}
-                <div
-                  onClick={handleMapClick}
-                  className="relative h-36 rounded-xl border border-stone-300 bg-stone-100 overflow-hidden cursor-crosshair shadow-inner group"
-                  title="Click anywhere to adjust your exact delivery pin"
-                >
-                  {/* Stylized Street Grid */}
-                  <svg className="absolute inset-0 w-full h-full opacity-60" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                      <pattern id="roadGrid" width="30" height="30" patternUnits="userSpaceOnUse">
-                        <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#cbd5e1" strokeWidth="1" />
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#roadGrid)" />
-                    {/* Main Marley Chowk Roundabout */}
-                    <circle cx="50%" cy="50%" r="24" fill="#fed7aa" stroke="#f97316" strokeWidth="2" strokeDasharray="3 3" />
-                    <text x="50%" y="52%" textAnchor="middle" fontSize="8" fill="#9a3412" fontWeight="bold">
-                      Marley Chowk
-                    </text>
-                    {/* Roads radiating out */}
-                    <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#fdba74" strokeWidth="4" />
-                    <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#fdba74" strokeWidth="4" />
-                  </svg>
-
-                  {/* Draggable / Clickable Live User Pin */}
-                  <div
-                    className="absolute -translate-x-1/2 -translate-y-full transition-all duration-300 flex flex-col items-center pointer-events-none z-10"
-                    style={{ left: `${pinOffset.x}%`, top: `${pinOffset.y}%` }}
+                    <Bike className="w-4 h-4" />
+                    <span>{isUr ? 'ہوم ڈیلیوری' : 'Home Delivery'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrderType('pickup')}
+                    className={`p-3 rounded-2xl border text-center font-bold flex items-center justify-center gap-2 transition-all ${
+                      orderType === 'pickup'
+                        ? 'border-red-700 bg-red-50 text-red-950 shadow-xs ring-1 ring-red-700'
+                        : 'border-stone-200 bg-white text-stone-600'
+                    }`}
                   >
-                    <div className="relative">
-                      <span className="absolute -inset-1 rounded-full bg-red-400 animate-ping opacity-75" />
-                      <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg border-2 border-white text-xs font-bold">
-                        📍
-                      </div>
-                    </div>
-                    <div className="bg-stone-900 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow mt-0.5 whitespace-nowrap">
-                      {isUr ? 'آپ کا گھر' : 'Your Spot'}
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-1 right-2 bg-white/90 text-[10px] text-stone-600 px-2 py-0.5 rounded shadow">
-                    Tap map to move pin
-                  </div>
+                    <Store className="w-4 h-4" />
+                    <span>{isUr ? 'خود آ کر لیں (پک اپ)' : 'Takeaway / Pickup'}</span>
+                  </button>
                 </div>
+              </div>
 
-                {/* Address & Specific House Details */}
-                <div className="space-y-2 pt-1">
+              {/* CUSTOMER DETAILS FORM */}
+              <div className="p-4 bg-[#FFF9F2] rounded-2xl border border-amber-200 space-y-3">
+                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wide flex items-center gap-1.5">
+                  <span>👤</span>
+                  <span>{isUr ? 'کسٹمر کی معلومات' : 'Customer & Delivery Information'}</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-stone-700 mb-1">
-                      {isUr ? 'گلی یا علاقہ' : 'Street / Area Name'}
+                      {isUr ? 'آپ کا نام *' : 'Your Full Name *'}
                     </label>
                     <input
                       type="text"
-                      value={addressInput}
-                      onChange={(e) => setAddressInput(e.target.value)}
-                      placeholder="e.g. Marley Chowk, Street 4"
-                      className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-stone-900 bg-white font-medium"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="e.g. Ali Ahmed"
+                      className="w-full text-xs px-3 py-2 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 font-medium text-stone-900"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                      {isUr ? 'فون نمبر / واٹس ایپ *' : 'Phone / WhatsApp *'}
+                    </label>
+                    <input
+                      type="text"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="0300-1234567"
+                      className="w-full text-xs px-3 py-2 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 font-medium text-stone-900"
+                    />
+                  </div>
+                </div>
+
+                {orderType === 'delivery' && (
+                  <>
                     <div>
-                      <label className="block text-[11px] font-bold text-stone-700 mb-1">
-                        {isUr ? 'مکان / فلیٹ نمبر' : 'House / Flat #'}
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-stone-700">
+                          {isUr ? 'ڈیلیوری ایڈریس (چوک مرلی)' : 'Delivery Address (Chowk Marley)'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleDetectLiveLocation}
+                          className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md hover:bg-emerald-100"
+                        >
+                          <Crosshair className="w-3 h-3" />
+                          <span>{isUr ? 'لائیو GPS سیٹ کریں' : 'Fetch GPS Pin'}</span>
+                        </button>
+                      </div>
                       <input
                         type="text"
-                        value={houseFlat}
-                        onChange={(e) => setHouseFlat(e.target.value)}
-                        placeholder="House 12B, 1st Floor"
-                        className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-stone-900 bg-white"
+                        value={addressInput}
+                        onChange={(e) => setAddressInput(e.target.value)}
+                        placeholder="Street, House #, Sector in Chowk Marley..."
+                        className="w-full text-xs px-3 py-2 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 font-medium text-stone-900"
                       />
                     </div>
 
                     <div>
                       <label className="block text-[11px] font-bold text-stone-700 mb-1">
-                        {isUr ? 'قریبی مشہور جگہ' : 'Nearby Landmark'}
+                        {isUr ? 'قریبی مشہور جگہ (لینڈ مارک)' : 'Nearby Landmark'}
                       </label>
                       <input
                         type="text"
-                        value={landmark}
-                        onChange={(e) => setLandmark(e.target.value)}
-                        placeholder="Near Masjid / Water Tank"
-                        className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-stone-900 bg-white"
+                        value={nearbyLandmark}
+                        onChange={(e) => setNearbyLandmark(e.target.value)}
+                        placeholder="e.g. Near Main Masjid / Water Tank"
+                        className="w-full text-xs px-3 py-2 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900"
                       />
                     </div>
-                  </div>
+
+                    {/* Interactive Pinpoint Map */}
+                    <div
+                      onClick={handleMapClick}
+                      className="relative h-28 rounded-xl border border-amber-300 bg-amber-50/50 overflow-hidden cursor-crosshair group shadow-inner"
+                      title="Tap anywhere to adjust delivery location in Chowk Marley"
+                    >
+                      <svg className="absolute inset-0 w-full h-full opacity-40">
+                        <defs>
+                          <pattern id="cartGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+                            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#d97706" strokeWidth="1" />
+                          </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#cartGrid)" />
+                        <circle cx="50%" cy="50%" r="20" fill="#fde68a" stroke="#d97706" strokeWidth="1.5" />
+                        <text x="50%" y="53%" textAnchor="middle" fontSize="7" fill="#78350f" fontWeight="bold">
+                          Chowk Marley
+                        </text>
+                      </svg>
+                      {/* Pin */}
+                      <div
+                        className="absolute -translate-x-1/2 -translate-y-full transition-all duration-300 flex flex-col items-center pointer-events-none"
+                        style={{ left: `${pinOffset.x}%`, top: `${pinOffset.y}%` }}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-red-700 text-white flex items-center justify-center text-xs font-bold shadow-md border-2 border-white">
+                          📍
+                        </div>
+                        <span className="text-[9px] font-black bg-stone-900 text-white px-1.5 py-0.2 rounded mt-0.5">
+                          Pin
+                        </span>
+                      </div>
+                      <div className="absolute bottom-1 right-2 text-[9px] text-stone-500 bg-white/80 px-1.5 py-0.5 rounded">
+                        Tap map to adjust pin
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                    {isUr ? 'خصوصی ہدایات' : 'Special Delivery / Cooking Instructions'}
+                  </label>
+                  <input
+                    type="text"
+                    value={additionalInstructions}
+                    onChange={(e) => setAdditionalInstructions(e.target.value)}
+                    placeholder="e.g. Call before arrival, extra spicy..."
+                    className="w-full text-xs px-3 py-2 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 text-stone-900"
+                  />
                 </div>
               </div>
 
               {/* Promo Voucher */}
               <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
                 <div className="flex items-center gap-2 text-xs font-bold text-stone-800 mb-2">
-                  <Tag className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{isUr ? 'ڈسکاؤنٹ واؤچر' : 'Promo Voucher'}</span>
+                  <Tag className="w-3.5 h-3.5 text-red-700" />
+                  <span>{isUr ? 'ڈسکاؤنٹ واؤچر کوڈ' : 'Apply Promo Voucher'}</span>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -469,18 +567,18 @@ export const CartDrawer: React.FC<Props> = ({
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="Enter SLICE20 or FREEDEL"
-                    className="flex-1 text-xs px-3 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono uppercase"
+                    className="flex-1 text-xs px-3 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-700 font-mono uppercase"
                   />
                   <button
                     onClick={applyPromo}
-                    className="px-3.5 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors"
+                    className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors"
                   >
                     {isUr ? 'لاگو کریں' : 'Apply'}
                   </button>
                 </div>
 
                 {appliedVoucher && (
-                  <div className="mt-2 text-[11px] text-emerald-700 flex items-center justify-between font-medium">
+                  <div className="mt-2 text-[11px] text-emerald-700 flex items-center justify-between font-bold">
                     <span>
                       ✓ {appliedVoucher.code} ({appliedVoucher.discountPercent}% off applied)
                     </span>
@@ -499,90 +597,94 @@ export const CartDrawer: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Phone & Contact */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">
-                  {isUr ? 'رابطہ نمبر (رائیڈر کے لیے)' : 'Phone Number (For Rider)'}
-                </label>
-                <input
-                  type="text"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-stone-800 bg-white"
-                />
-              </div>
-
               {/* Payment Methods */}
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-2">
                   {isUr ? 'طریقہ ادائیگی' : 'Payment Method'}
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {[
-                    { id: 'cod', label: 'Cash on Delivery', sub: 'Pay rider at Marley Chowk' },
-                    { id: 'jazzcash', label: 'JazzCash / EasyPaisa', sub: 'Mobile payment' },
-                    { id: 'card', label: 'Credit / Debit Card', sub: 'Visa & Mastercard' },
-                    { id: 'easypaisa', label: 'Raast QR Instant', sub: 'Instant transfer' },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(p.id as any)}
-                      className={`p-2.5 rounded-xl border text-left transition-colors ${
-                        paymentMethod === p.id
-                          ? 'border-amber-500 bg-amber-50 text-stone-900 font-semibold'
-                          : 'border-stone-200 hover:border-stone-300 text-stone-600 bg-white'
-                      }`}
-                    >
-                      <div className="font-bold truncate">{p.label}</div>
-                      <div className="text-[10px] text-stone-400 mt-0.5">{p.sub}</div>
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('cod')}
+                    className="p-3 rounded-2xl border border-red-700 bg-red-50 text-red-950 font-bold text-left"
+                  >
+                    <div>{orderType === 'delivery' ? 'Cash on Delivery' : 'Cash on Pickup'}</div>
+                    <div className="text-[10px] text-stone-500 font-normal mt-0.5">Pay upon receiving food</div>
+                  </button>
+
+                  <div className="p-3 rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-stone-400 text-left cursor-not-allowed">
+                    <div className="font-semibold text-stone-500">Online Card / Wallet</div>
+                    <div className="text-[10px] text-stone-400 mt-0.5">Coming soon</div>
+                  </div>
                 </div>
               </div>
 
-              {/* Price Breakdown */}
-              <div className="pt-3 border-t border-stone-100 text-xs space-y-1.5 text-stone-600">
+              {/* Price Breakdown in PKR */}
+              <div className="pt-3 border-t border-stone-200 text-xs space-y-1.5 text-stone-600">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-medium text-stone-900">${subtotal.toFixed(2)}</span>
+                  <span className="font-bold text-stone-900 font-mono">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Marley Chowk Delivery Fee</span>
-                  <span className="font-medium text-stone-900">
-                    {deliveryFee === 0 ? 'FREE' : `$${deliveryFee.toFixed(2)}`}
-                  </span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-medium">
-                    <span>Voucher Discount</span>
-                    <span>-${discountAmount.toFixed(2)}</span>
+                {orderType === 'delivery' && (
+                  <div className="flex justify-between">
+                    <span>Delivery Charges (Chowk Marley)</span>
+                    <span className="font-bold text-stone-900 font-mono">
+                      {deliveryFee === 0 ? 'FREE' : formatPrice(deliveryFee)}
+                    </span>
                   </div>
                 )}
-                <div className="flex justify-between text-base font-bold text-stone-900 pt-2 border-t border-stone-200">
-                  <span>Total Amount</span>
-                  <span>${grandTotal.toFixed(2)}</span>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-bold">
+                    <span>Voucher Discount</span>
+                    <span className="font-mono">-{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-black text-red-700 pt-2 border-t border-stone-200">
+                  <span>Grand Total</span>
+                  <span className="font-mono text-lg">{formatPrice(grandTotal)}</span>
                 </div>
               </div>
+
+              {formError && (
+                <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
             </>
           )}
         </div>
 
-        {/* Footer Checkout Action */}
+        {/* Action Buttons: WhatsApp Order + Confirm Button */}
         {items.length > 0 && (
-          <div className="p-4 sm:p-5 border-t border-stone-100 bg-white shadow-lg">
+          <div className="p-4 sm:p-5 border-t border-amber-100 bg-[#FFF9F2] space-y-2.5">
+            {/* Direct WhatsApp Ordering (Primary User Requirement) */}
             <button
-              onClick={handleCheckout}
-              className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-stone-950 font-bold text-sm rounded-2xl shadow-md shadow-amber-500/25 flex items-center justify-between transition-all"
+              onClick={handleOrderViaWhatsApp}
+              className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm rounded-2xl shadow-md shadow-emerald-600/25 flex items-center justify-between transition-all"
             >
               <div className="flex items-center gap-2">
-                <span>🍕</span>
-                <span>{isUr ? 'آرڈر کنفرم کریں (مرلی چوک)' : 'Confirm Order at Marley Chowk'}</span>
+                <MessageCircle className="w-5 h-5 text-white" />
+                <span>{isUr ? 'واٹس ایپ کے ذریعے آرڈر کریں' : 'Order via WhatsApp'}</span>
               </div>
-              <div className="font-extrabold text-stone-950">
-                ${grandTotal.toFixed(2)}
+              <div className="font-mono font-black text-white text-base">
+                {formatPrice(grandTotal)}
               </div>
             </button>
+
+            {/* Standard Instant Web Checkout */}
+            <button
+              onClick={handleLocalOrderSubmit}
+              className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 text-stone-100 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors"
+            >
+              <span>{isUr ? 'ویب سائٹ کے ذریعے کنفرم کریں' : 'Place Order & View Demo Tracker'}</span>
+            </button>
+
+            <p className="text-[10px] text-stone-500 text-center leading-tight">
+              {isUr
+                ? 'واٹس ایپ پر میسج بھیجنے کے بعد ریسٹورنٹ دستیابی اور وقت کی تصدیق کرے گا۔'
+                : 'Note: Opening WhatsApp generates your order message. The restaurant will review and confirm availability.'}
+            </p>
           </div>
         )}
       </div>
