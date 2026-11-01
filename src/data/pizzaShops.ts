@@ -1,0 +1,272 @@
+import { PizzaShop, PizzaTopping } from '../types/pizza';
+
+export const AVAILABLE_TOPPINGS: PizzaTopping[] = [
+  { id: 'pepperoni', name: 'Crispy Pepperoni', price: 1.5, category: 'meat', color: '#b91c1c' },
+  { id: 'chicken_fajita', name: 'Smoked Fajita Chicken', price: 1.8, category: 'meat', color: '#c2410c' },
+  { id: 'sausage', name: 'Italian Beef Sausage', price: 1.6, category: 'meat', color: '#7c2d12' },
+  { id: 'mushrooms', name: 'Portobello Mushrooms', price: 0.9, category: 'veg', color: '#78716c' },
+  { id: 'black_olives', name: 'Kalamata Black Olives', price: 0.8, category: 'veg', color: '#1c1917' },
+  { id: 'jalapenos', name: 'Spicy Green Jalapeños', price: 0.75, category: 'veg', color: '#15803d' },
+  { id: 'bell_peppers', name: 'Crisp Bell Peppers', price: 0.7, category: 'veg', color: '#16a34a' },
+  { id: 'red_onions', name: 'Caramelized Red Onions', price: 0.6, category: 'veg', color: '#86198f' },
+  { id: 'sweet_corn', name: 'Golden Sweet Corn', price: 0.65, category: 'veg', color: '#eab308' },
+  { id: 'fresh_basil', name: 'Sweet Fresh Basil', price: 0.8, category: 'veg', color: '#22c55e' },
+  { id: 'mozzarella', name: 'Buffalo Mozzarella Pearls', price: 1.4, category: 'cheese', color: '#fef08a' },
+  { id: 'parmesan', name: 'Aged Shaved Parmesan', price: 1.2, category: 'cheese', color: '#fef9c3' },
+];
+
+export const PIZZA_SHOPS: PizzaShop[] = [
+  {
+    id: 'slice-craft-marley',
+    name: 'SliceCraft Artisan Pizzeria',
+    urduName: 'سلائس کرافٹ پیزیریا (مرلی چوک)',
+    tagline: 'Fresh New York giant slices & wood-fired crusts right at Marley Chowk',
+    rating: 4.9,
+    reviewCount: 412,
+    deliveryTime: '15-25 min',
+    deliveryFee: 1.49,
+    minOrder: 5.0,
+    distanceKm: 0.4,
+    address: 'Shop #4, Main Market, Marley Chowk',
+    area: 'Marley Chowk',
+    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
+    bannerImage: 'https://images.unsplash.com/photo-1579751626657-72bc17010498?w=1200&auto=format&fit=crop&q=80',
+    isOpen: true,
+    hasSingleSlices: true,
+    isFeatured: true,
+    priceLevel: '$$',
+    specialOffer: 'Marley Chowk Special: Free Garlic Dip with 2 Slices',
+    tags: ['Single Slices', 'Wood Fired', 'Halal', 'Marley Chowk Hub'],
+    menu: [
+      {
+        id: 'slice-classic-ny',
+        name: 'The Big Apple Pepperoni Slice',
+        urduName: 'نیو یارک پیپرونی سلائس',
+        description: 'Iconic foldable NY thin crust slice topped with cupping pepperoni, fresh oregano, and whole milk mozzarella.',
+        price: 4.49,
+        slicePrice: 4.49,
+        category: 'slices',
+        image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=600&auto=format&fit=crop&q=80',
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Single Mega Slice (Foldable)', description: 'One massive 12-inch triangular slice', price: 4.49 },
+          { id: 'regular', label: 'Medium 10-inch Pie (6 Slices)', description: 'Ideal for 1-2 people', price: 13.99 },
+          { id: 'large', label: 'Large 14-inch Pie (8 Slices)', description: 'Ideal for 3-4 friends', price: 19.99 },
+          { id: 'jumbo', label: 'Party 18-inch Giant (12 Slices)', description: 'Great for parties and gatherings', price: 27.99 },
+        ]
+      },
+      {
+        id: 'slice-truffle-shroom',
+        name: 'Wild Truffle & Mushroom Slice',
+        urduName: 'مشروم ٹرفل پیزا سلائس',
+        description: 'White garlic base, roasted forest mushrooms, creamy fontina, thyme, and white truffle glaze drizzle.',
+        price: 4.99,
+        slicePrice: 4.99,
+        category: 'slices',
+        image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=600&auto=format&fit=crop&q=80',
+        isVegetarian: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Single Slice', description: 'Single hot oven slice', price: 4.99 },
+          { id: 'regular', label: 'Medium 10-inch Pie', description: 'For mushroom lovers', price: 14.99 },
+          { id: 'large', label: 'Large 14-inch Pie', description: 'Generous truffle aroma', price: 21.99 },
+        ]
+      },
+      {
+        id: 'pie-margherita-di-bufala',
+        name: 'Margherita Royale Sourdough',
+        urduName: 'مارگریٹا روئیل پیزا',
+        description: '24-hour slow fermented sourdough crust, San Marzano D.O.P tomatoes, buffalo mozzarella, and fresh basil leaves.',
+        price: 12.99,
+        slicePrice: 3.99,
+        category: 'classic',
+        image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=600&auto=format&fit=crop&q=80',
+        isVegetarian: true,
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Quick Lunch Slice', description: 'Crispy warm slice', price: 3.99 },
+          { id: 'regular', label: 'Medium 10-inch', description: 'Traditional Italian style', price: 12.99 },
+          { id: 'large', label: 'Large 14-inch', description: 'Classic family favorite', price: 17.99 },
+        ]
+      },
+      {
+        id: 'pie-spicy-tikka-fusion',
+        name: 'Smoky Tikka Supreme Pizza',
+        urduName: 'تکا سپریم پیزا',
+        description: 'Charcoal grilled chicken tikka cubes, pickled red onion, spicy jalapeños, coriander herb swirl, and garlic crust.',
+        price: 14.99,
+        slicePrice: 4.79,
+        category: 'specialty',
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop&q=80',
+        isSpicy: true,
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Spicy Single Slice', description: 'Perfect quick bite', price: 4.79 },
+          { id: 'regular', label: 'Medium 10-inch', description: 'Smoky spiced goodness', price: 14.99 },
+          { id: 'large', label: 'Large 14-inch', description: 'Loaded with chicken', price: 20.99 },
+        ]
+      },
+      {
+        id: 'combo-slice-duo',
+        name: 'Marley Twin Slice & Cold Drink Deal',
+        urduName: 'مرلی ٹوئن سلائس ڈیل',
+        description: 'Any 2 hot slices of your choice + 1 Garlic Mayo Dip + chilled soda.',
+        price: 9.49,
+        category: 'deals',
+        image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&auto=format&fit=crop&q=80',
+        isBestseller: true,
+      }
+    ]
+  },
+  {
+    id: 'cheesy-crust-marley',
+    name: 'Cheesy Crust & Slice Hub',
+    urduName: 'چیزی کرسٹ ہب (مرلی چوک روڈ)',
+    tagline: 'Famous 1-meter cheese pull & budget slices near Marley Chowk',
+    rating: 4.8,
+    reviewCount: 580,
+    deliveryTime: '15-20 min',
+    deliveryFee: 0.99,
+    minOrder: 4.0,
+    distanceKm: 0.3,
+    address: 'Commercial Center, Opposite Marley Chowk Roundabout',
+    area: 'Marley Chowk',
+    image: 'https://images.unsplash.com/photo-1590947132387-155cc02f3212?w=800&auto=format&fit=crop&q=80',
+    bannerImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&auto=format&fit=crop&q=80',
+    isOpen: true,
+    hasSingleSlices: true,
+    isFeatured: true,
+    priceLevel: '$',
+    specialOffer: 'Flat 20% OFF with code SLICE20',
+    tags: ['Single Slices', 'Cheese Stuffed Crust', 'Fast Delivery', 'Best Value'],
+    menu: [
+      {
+        id: 'slice-cheese-burst',
+        name: 'Mega Cheese Pull Slice',
+        urduName: 'میگا چیز پل سلائس',
+        description: '3 layers of mozzarella, cheddar, and gouda with liquid cheese stuffed into the crust rim.',
+        price: 3.99,
+        slicePrice: 3.99,
+        category: 'slices',
+        image: 'https://images.unsplash.com/photo-1573821663912-569905455b1c?w=600&auto=format&fit=crop&q=80',
+        isBestseller: true,
+        isVegetarian: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Single Mega Stuffed Slice', description: 'Liquid cheese core', price: 3.99 },
+          { id: 'regular', label: 'Medium 10-inch Stuffed Pie', description: 'Cheese inside crust ring', price: 11.99 },
+          { id: 'large', label: 'Large 14-inch Stuffed Pie', description: 'Maximum cheese pull', price: 16.99 },
+        ]
+      },
+      {
+        id: 'slice-bbq-supreme',
+        name: 'Smokey BBQ Ranch Chicken Slice',
+        urduName: 'بی بی کیو رینچ چکن سلائس',
+        description: 'Grilled BBQ chicken tender chunks, sweet caramelized onion, tangy sweet BBQ swirl, and buttermilk ranch sauce.',
+        price: 4.29,
+        slicePrice: 4.29,
+        category: 'slices',
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop&q=80',
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Single Slice', description: 'Loaded BBQ & ranch', price: 4.29 },
+          { id: 'regular', label: 'Medium 10-inch', description: 'Hearty flavor feast', price: 12.99 },
+          { id: 'large', label: 'Large 14-inch', description: 'Crowd pleaser', price: 18.49 },
+        ]
+      }
+    ]
+  },
+  {
+    id: 'flame-oven-marley',
+    name: 'Flame Oven Napoli',
+    urduName: 'فلیم اوون نیپولی (نزد مرلی چوک)',
+    tagline: 'Authentic 90-second 480°C wood-fired Neapolitan pizzas',
+    rating: 4.8,
+    reviewCount: 310,
+    deliveryTime: '20-30 min',
+    deliveryFee: 1.49,
+    minOrder: 8.0,
+    distanceKm: 0.8,
+    address: 'East Service Road, Near Marley Chowk',
+    area: 'Marley Chowk',
+    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
+    bannerImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80',
+    isOpen: true,
+    hasSingleSlices: true,
+    priceLevel: '$$',
+    specialOffer: 'Free Delivery for Marley Chowk Residents',
+    tags: ['Wood Fired', 'Authentic Italian', 'Napoli Certified', 'Gourmet'],
+    menu: [
+      {
+        id: 'pie-diavola-fire',
+        name: 'Diavola Hot Honey Fire Pizza',
+        urduName: 'ڈیاوولا ہاٹ ہنی پیزا',
+        description: 'Spicy soppressata beef, crushed calabrian chili flakes, fior di latte cheese, and organic hot chili honey drizzle.',
+        price: 15.99,
+        slicePrice: 4.99,
+        category: 'specialty',
+        image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=600&auto=format&fit=crop&q=80',
+        isSpicy: true,
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Single Hot Honey Slice', description: 'Spicy & sweet kick', price: 4.99 },
+          { id: 'regular', label: '11-inch Personal Napoli', description: 'Leopard-spotted puffed crust', price: 15.99 },
+          { id: 'large', label: '13-inch Sharing Napoli', description: 'Light, airy Italian crust', price: 21.99 }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'detroit-deep-dish-marley',
+    name: 'Detroit Deep Dish Corner',
+    urduName: 'ڈیٹرائٹ ڈیپ ڈش (مرلی چوک)',
+    tagline: 'Square steel-pan pizzas with crispy caramelized cheese edges',
+    rating: 4.7,
+    reviewCount: 220,
+    deliveryTime: '25-35 min',
+    deliveryFee: 1.80,
+    minOrder: 10.0,
+    distanceKm: 0.9,
+    address: 'Food Street Lane 2, Marley Chowk',
+    area: 'Marley Chowk',
+    image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?w=800&auto=format&fit=crop&q=80',
+    bannerImage: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?w=1200&auto=format&fit=crop&q=80',
+    isOpen: true,
+    hasSingleSlices: true,
+    priceLevel: '$$',
+    specialOffer: 'Deep Dish Corner Slices Available Daily',
+    tags: ['Detroit Style', 'Deep Dish', 'Thick Crust', 'Single Slices'],
+    menu: [
+      {
+        id: 'pie-detroit-red-stripe',
+        name: 'The Motor City Red Top Square',
+        urduName: 'موٹر سٹی ریڈ ٹاپ اسکوائر',
+        description: 'Wisconsin brick cheese melting to pan edge for crunchy browned crust, topped with simmered marinara.',
+        price: 15.49,
+        slicePrice: 4.89,
+        category: 'specialty',
+        image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?w=600&auto=format&fit=crop&q=80',
+        isBestseller: true,
+        customizable: true,
+        availableSizes: [
+          { id: 'slice', label: 'Corner Square Slice', description: 'Crunchy two-edge slice', price: 4.89 },
+          { id: 'regular', label: '4-Corner Small Pan', description: 'Feeds 2 hungry pizza lovers', price: 15.49 },
+          { id: 'large', label: '8-Corner Big Steel Pan', description: 'Feeds 4-5 people', price: 23.99 },
+        ]
+      }
+    ]
+  }
+];
+
+export const POPULAR_LOCATIONS = [
+  { id: 'loc-1', name: 'Marley Chowk Main Roundabout', city: 'Marley Chowk', isCurrent: true },
+  { id: 'loc-2', name: 'Commercial Market, Marley Chowk', city: 'Marley Chowk', isCurrent: false },
+  { id: 'loc-3', name: 'Street 4, Near Water Tank, Marley Chowk', city: 'Marley Chowk', isCurrent: false },
+  { id: 'loc-4', name: 'North Block / Main Road, Marley Chowk', city: 'Marley Chowk', isCurrent: false },
+  { id: 'loc-5', name: 'East Lane, Opposite Shell, Marley Chowk', city: 'Marley Chowk', isCurrent: false },
+];

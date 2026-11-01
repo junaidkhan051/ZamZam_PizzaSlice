@@ -1,0 +1,8 @@
+{
+  "name": "Pizza Slice - Local Pizza Finder & Order",
+  "description": "Discover local pizza shops, customize slices & artisan pies, and order online with live delivery tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
